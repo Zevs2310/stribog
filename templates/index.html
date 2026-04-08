@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stribog</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #faf8f5;
+    --surface: #fff;
+    --border: #e8e4de;
+    --text: #2a2520;
+    --text-dim: #8a8480;
+    --accent: #3d6b4f;
+    --accent-light: #e8f0eb;
+    --teach: #5b7c3a;
+    --teach-bg: #f0f5e8;
+    --correct: #b8602a;
+    --correct-bg: #fdf0e8;
+    --ask: #3a5c7c;
+    --ask-bg: #e8f0f8;
+    --user-bg: #f0ede8;
+    --stribog-bg: #fff;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Source Serif 4', Georgia, serif;
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ====== SIDEBAR ====== */
+  .sidebar {
+    width: 280px;
+    min-width: 280px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .logo {
+    padding: 24px 20px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo h1 {
+    font-family: 'Source Serif 4', serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.5px;
+  }
+
+  .logo p {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  .stats-panel {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .stat-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .stat-box {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+  }
+
+  .stat-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--accent);
+  }
+
+  .stat-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 8px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .memory-panel {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 20px;
+  }
+
+  .memory-item {
+    padding: 8px 10px;
+    background: var(--bg);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    font-size: 12px;
+    line-height: 1.5;
+    border-left: 3px solid var(--accent);
+  }
+
+  .memory-item .topic {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .memory-item .content {
+    color: var(--text);
+    margin-top: 2px;
+  }
+
+  .memory-empty {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    font-style: italic;
+    padding: 30px 10px;
+    line-height: 1.6;
+  }
+
+  /* ====== MAIN CHAT ====== */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .chat-header {
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  .chat-title {
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .chat-subtitle {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  .chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .msg {
+    max-width: 75%;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .msg.user {
+    align-self: flex-end;
+  }
+
+  .msg.assistant {
+    align-self: flex-start;
+  }
+
+  .msg-bubble {
+    padding: 12px 16px;
+    border-radius: 16px;
+    font-size: 14px;
+    line-height: 1.6;
+    box-shadow: var(--shadow);
+  }
+
+  .msg.user .msg-bubble {
+    background: var(--user-bg);
+    border-bottom-right-radius: 4px;
+  }
+
+  .msg.assistant .msg-bubble {
+    background: var(--stribog-bg);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+  }
+
+  .msg-meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    padding: 0 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .msg.user .msg-meta {
+    justify-content: flex-end;
+  }
+
+  .intent-badge {
+    font-size: 8px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .intent-teach { background: var(--teach-bg); color: var(--teach); }
+  .intent-correct { background: var(--correct-bg); color: var(--correct); }
+  .intent-ask { background: var(--ask-bg); color: var(--ask); }
+  .intent-chat { background: var(--bg); color: var(--text-dim); }
+
+  .feedback-btns {
+    display: flex;
+    gap: 4px;
+    margin-top: 2px;
+  }
+
+  .fb-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2px 8px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s;
+    color: var(--text-dim);
+  }
+
+  .fb-btn:hover { border-color: var(--accent); }
+  .fb-btn.active-pos { background: var(--teach-bg); border-color: var(--teach); }
+  .fb-btn.active-neg { background: var(--correct-bg); border-color: var(--correct); }
+
+  /* ====== INPUT ====== */
+  .input-area {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+
+  .input-area textarea {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-family: 'Source Serif 4', serif;
+    font-size: 14px;
+    resize: none;
+    outline: none;
+    max-height: 120px;
+    line-height: 1.5;
+    background: var(--bg);
+    color: var(--text);
+    transition: border-color 0.2s;
+  }
+
+  .input-area textarea:focus {
+    border-color: var(--accent);
+  }
+
+  .input-area textarea::placeholder {
+    color: var(--text-dim);
+  }
+
+  .send-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.15s;
+  }
+
+  .send-btn:hover { background: #345d43; transform: scale(1.05); }
+  .send-btn:disabled { background: var(--border); cursor: not-allowed; transform: none; }
+
+  .send-btn svg {
+    width: 18px;
+    height: 18px;
+    fill: white;
+  }
+
+  /* ====== WELCOME ====== */
+  .welcome {
+    text-align: center;
+    padding: 60px 40px;
+    color: var(--text-dim);
+  }
+
+  .welcome .big-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+  }
+
+  .welcome h2 {
+    font-family: 'Source Serif 4', serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+
+  .welcome p {
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+
+  .suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 20px;
+  }
+
+  .suggestion {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 8px 16px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: 'Source Serif 4', serif;
+  }
+
+  .suggestion:hover {
+    border-color: var(--accent);
+    background: var(--accent-light);
+  }
+
+  /* ====== TYPING INDICATOR ====== */
+  .typing {
+    display: none;
+    align-self: flex-start;
+    padding: 12px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    border-bottom-left-radius: 4px;
+  }
+
+  .typing.show { display: flex; gap: 4px; align-items: center; }
+
+  .typing span {
+    width: 6px;
+    height: 6px;
+    background: var(--text-dim);
+    border-radius: 50%;
+    animation: bounce 1.2s infinite;
+  }
+
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); }
+    30% { transform: translateY(-5px); }
+  }
+
+  /* ====== SCROLLBAR ====== */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ====== RESPONSIVE ====== */
+  @media (max-width: 768px) {
+    .sidebar { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="logo">
+    <h1>𐤎 Stribog</h1>
+    <p>slovenski bog vetrova</p>
+  </div>
+
+  <div class="stats-panel">
+    <div class="stat-title">Stanje uma</div>
+    <div class="stat-grid">
+      <div class="stat-box">
+        <div class="stat-num" id="statLessons">0</div>
+        <div class="stat-label">Lekcije</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="statCorrections">0</div>
+        <div class="stat-label">Ispravke</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="statPositive">0</div>
+        <div class="stat-label">👍 Bravo</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="statNegative">0</div>
+        <div class="stat-label">👎 Greška</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats-panel">
+    <div class="stat-title">Memorija</div>
+  </div>
+
+  <div class="memory-panel" id="memoryPanel">
+    <div class="memory-empty">
+      Stribog još ništa ne zna.<br>
+      Nauči ga nečemu.
+    </div>
+  </div>
+</div>
+
+<!-- MAIN CHAT -->
+<div class="main">
+  <div class="chat-header">
+    <div class="avatar">𐤎</div>
+    <div>
+      <div class="chat-title">Stribog</div>
+      <div class="chat-subtitle" id="statusText">čeka da ga naučiš nečemu...</div>
+    </div>
+  </div>
+
+  <div class="chat-area" id="chatArea">
+    <div class="welcome">
+      <div class="big-icon">🌬️</div>
+      <h2>Zdravo, ja sam Stribog</h2>
+      <p>
+        Ne znam ništa. Bukvalno ništa. Ali sam spreman da učim.
+        Nauči me nešto, pitaj me nešto, ili samo pričaj sa mnom.
+      </p>
+      <div class="suggestions">
+        <div class="suggestion" onclick="sendSuggestion('Zapamti da je nebo plavo')">Zapamti da je nebo plavo</div>
+        <div class="suggestion" onclick="sendSuggestion('Kako se zoveš?')">Kako se zoveš?</div>
+        <div class="suggestion" onclick="sendSuggestion('Zapamti da se ja zovem Marko')">Nauči moje ime</div>
+        <div class="suggestion" onclick="sendSuggestion('Šta znaš?')">Šta znaš?</div>
+      </div>
+    </div>
+
+    <div class="typing" id="typingIndicator">
+      <span></span><span></span><span></span>
+    </div>
+  </div>
+
+  <div class="input-area">
+    <textarea id="msgInput" rows="1" placeholder="Nauči Striboga nečemu, ili ga pitaj nešto..."
+              onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+    <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+      <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+  const chatArea = document.getElementById('chatArea');
+  const msgInput = document.getElementById('msgInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const typing = document.getElementById('typingIndicator');
+  let sending = false;
+
+  // ====== SEND MESSAGE ======
+  async function sendMessage() {
+    const text = msgInput.value.trim();
+    if (!text || sending) return;
+
+    sending = true;
+    sendBtn.disabled = true;
+
+    // Remove welcome
+    const welcome = chatArea.querySelector('.welcome');
+    if (welcome) welcome.remove();
+
+    // Add user message
+    addMessage('user', text);
+    msgInput.value = '';
+    autoResize(msgInput);
+
+    // Show typing
+    typing.classList.add('show');
+    chatArea.scrollTop = chatArea.scrollHeight;
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text })
+      });
+      const data = await res.json();
+
+      typing.classList.remove('show');
+      addMessage('assistant', data.response, data.message_id, data.intent);
+
+      // Refresh stats
+      loadStats();
+    } catch (err) {
+      typing.classList.remove('show');
+      addMessage('assistant', '(Ne mogu da razmišljam... proveri server.)', null, 'error');
+    }
+
+    sending = false;
+    sendBtn.disabled = false;
+    msgInput.focus();
+  }
+
+  function sendSuggestion(text) {
+    msgInput.value = text;
+    sendMessage();
+  }
+
+  // ====== ADD MESSAGE TO CHAT ======
+  function addMessage(role, text, msgId, intent) {
+    const div = document.createElement('div');
+    div.className = `msg ${role}`;
+
+    let metaHtml = '';
+    const time = new Date().toLocaleTimeString('sr', { hour: '2-digit', minute: '2-digit' });
+
+    if (role === 'assistant' && intent) {
+      const intentLabels = {
+        teach: 'učenje', correct: 'ispravka', ask: 'pitanje', chat: 'razgovor'
+      };
+      metaHtml = `
+        <div class="msg-meta">
+          <span>${time}</span>
+          <span class="intent-badge intent-${intent}">${intentLabels[intent] || intent}</span>
+        </div>`;
+    } else {
+      metaHtml = `<div class="msg-meta"><span>${time}</span></div>`;
+    }
+
+    let feedbackHtml = '';
+    if (role === 'assistant' && msgId) {
+      feedbackHtml = `
+        <div class="feedback-btns">
+          <button class="fb-btn" onclick="sendFeedback(${msgId}, 'positive', this)" title="Bravo!">👍</button>
+          <button class="fb-btn" onclick="sendFeedback(${msgId}, 'negative', this)" title="Pogrešno">👎</button>
+        </div>`;
+    }
+
+    div.innerHTML = `
+      <div class="msg-bubble">${escapeHtml(text)}</div>
+      ${metaHtml}
+      ${feedbackHtml}
+    `;
+
+    // Insert before typing indicator
+    chatArea.insertBefore(div, typing);
+    chatArea.scrollTop = chatArea.scrollHeight;
+  }
+
+  // ====== FEEDBACK ======
+  async function sendFeedback(msgId, type, btn) {
+    try {
+      await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message_id: msgId, type })
+      });
+
+      // Visual feedback
+      const btns = btn.parentElement.querySelectorAll('.fb-btn');
+      btns.forEach(b => { b.classList.remove('active-pos', 'active-neg'); b.disabled = true; });
+      btn.classList.add(type === 'positive' ? 'active-pos' : 'active-neg');
+
+      loadStats();
+    } catch (e) {}
+  }
+
+  // ====== LOAD STATS & MEMORY ======
+  async function loadStats() {
+    try {
+      const res = await fetch('/api/stats');
+      const data = await res.json();
+
+      document.getElementById('statLessons').textContent = data.stats.lessons;
+      document.getElementById('statCorrections').textContent = data.stats.corrections;
+      document.getElementById('statPositive').textContent = data.stats.positive_feedback;
+      document.getElementById('statNegative').textContent = data.stats.negative_feedback;
+
+      // Update status text
+      const total = data.stats.lessons;
+      const st = document.getElementById('statusText');
+      if (total === 0) st.textContent = 'čeka da ga naučiš nečemu...';
+      else if (total < 5) st.textContent = `zna ${total} stvari — još uvek beba`;
+      else if (total < 15) st.textContent = `zna ${total} stvari — polako uči`;
+      else if (total < 30) st.textContent = `zna ${total} stvari — raste`;
+      else st.textContent = `zna ${total} stvari — postaje pametan`;
+
+      // Memory panel
+      const mp = document.getElementById('memoryPanel');
+      if (data.lessons && data.lessons.length > 0) {
+        mp.innerHTML = data.lessons.map(l => `
+          <div class="memory-item">
+            <div class="topic">${escapeHtml(l.topic || 'general')}</div>
+            <div class="content">${escapeHtml(l.content)}</div>
+          </div>
+        `).join('');
+      } else {
+        mp.innerHTML = '<div class="memory-empty">Stribog još ništa ne zna.<br>Nauči ga nečemu.</div>';
+      }
+    } catch (e) {}
+  }
+
+  // ====== HELPERS ======
+  function escapeHtml(text) {
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }
+
+  // Initial load
+  loadStats();
+</script>
+</body>
+</html>
