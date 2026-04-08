@@ -17,8 +17,8 @@ app = Flask(__name__)
 # ============================================================
 # CONFIG
 # ============================================================
-CLAUDE_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-CLAUDE_MODEL = "claude-sonnet-4-20250514"
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = "gemini-2.0-flash"
 DB_PATH = os.path.join(os.path.dirname(__file__), "stribog_memory.db")
 
 # ============================================================
@@ -192,7 +192,7 @@ def store_feedback(message_id, feedback_type, note=""):
     conn.close()
 
 # ============================================================
-# STRIBOG'S BRAIN — Claude API + Memory = Reasoning
+# STRIBOG'S BRAIN — Gemini API + Memory = Reasoning
 # ============================================================
 def build_system_prompt():
     identity = get_identity()
@@ -254,44 +254,58 @@ VAŽNO: Odgovaraj kratko i prirodno. Ne budi previše formalan. Ti si dete koje 
     return system
 
 def think(user_message):
-    """Stribog thinks using Claude API + his memory"""
+    """Stribog thinks using Gemini API + his memory"""
 
-    if not CLAUDE_API_KEY:
-        return "(Stribog nema API ključ. Postavi ANTHROPIC_API_KEY environment variable.)"
+    if not GEMINI_API_KEY:
+        return "(Stribog nema API ključ. Postavi GEMINI_API_KEY environment variable.)"
 
     # Build context from conversation history
     history = get_conversation_history(limit=16)
-    messages = []
+
+    # Gemini format: contents array with role "user" or "model"
+    contents = []
+
+    # Add system instruction as first user message context
+    system_prompt = build_system_prompt()
+
     for msg in history:
-        messages.append({
-            "role": msg["role"],
-            "content": msg["content"]
+        role = "model" if msg["role"] == "assistant" else "user"
+        contents.append({
+            "role": role,
+            "parts": [{"text": msg["content"]}]
         })
+
     # Add current message
-    messages.append({"role": "user", "content": user_message})
+    contents.append({
+        "role": "user",
+        "parts": [{"text": user_message}]
+    })
 
     try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
+
         response = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "Content-Type": "application/json",
-                "x-api-key": CLAUDE_API_KEY,
-                "anthropic-version": "2023-06-01"
-            },
+            url,
+            headers={"Content-Type": "application/json"},
             json={
-                "model": CLAUDE_MODEL,
-                "max_tokens": 1024,
-                "system": build_system_prompt(),
-                "messages": messages
+                "system_instruction": {
+                    "parts": [{"text": system_prompt}]
+                },
+                "contents": contents,
+                "generationConfig": {
+                    "maxOutputTokens": 1024,
+                    "temperature": 0.7
+                }
             },
             timeout=30
         )
         data = response.json()
 
-        if "content" in data and len(data["content"]) > 0:
-            return data["content"][0]["text"]
+        if "candidates" in data and len(data["candidates"]) > 0:
+            return data["candidates"][0]["content"]["parts"][0]["text"]
         else:
-            return f"(Greška u razmišljanju: {data.get('error', {}).get('message', 'Unknown error')})"
+            error_msg = data.get("error", {}).get("message", "Unknown error")
+            return f"(Greška u razmišljanju: {error_msg})"
 
     except Exception as e:
         return f"(Ne mogu da razmišljam trenutno: {str(e)})"
