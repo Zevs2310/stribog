@@ -17,7 +17,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "")
 # DATABASE (PostgreSQL — Neon.tech, trajna memorija)
 # ============================================================
 def get_db():
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = psycopg.connect(DATABASE_URL)
     return conn
 
 def init_db():
@@ -51,7 +51,7 @@ def init_db():
 # ============================================================
 def get_conversation_history(limit=20):
     conn = get_db()
-    c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    c = conn.cursor(row_factory=dict_row)
     c.execute("SELECT role, content FROM conversations ORDER BY id DESC LIMIT %s", (limit,))
     msgs = c.fetchall()
     c.close()
@@ -60,7 +60,7 @@ def get_conversation_history(limit=20):
 
 def get_all_lessons():
     conn = get_db()
-    c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    c = conn.cursor(row_factory=dict_row)
     c.execute("SELECT topic, content, created_at FROM lessons ORDER BY created_at DESC LIMIT 50")
     lessons = c.fetchall()
     c.close()
@@ -104,7 +104,6 @@ def simple_local_brain(message):
     return "Zanimljivo 🤔 Reci mi više."
 
 def build_system_prompt():
-    # Ubaci sve lekcije u system prompt da Stribog zna šta je naučio
     lessons = get_all_lessons()
 
     if lessons:
