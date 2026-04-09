@@ -1,6 +1,6 @@
-
 import os
-import sqlite3
+import psycopg2
+import psycopg2.extras
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify
 import requests
@@ -11,14 +11,13 @@ app = Flask(__name__)
 # CONFIG
 # ============================================================
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-DB_PATH = os.path.join(os.path.dirname(__file__), "stribog_memory.db")
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
 # ============================================================
-# DATABASE
+# DATABASE (PostgreSQL — Neon.tech, trajna memorija)
 # ============================================================
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(DATABASE_URL)
     return conn
 
 def init_db():
@@ -27,23 +26,24 @@ def init_db():
 
     c.execute("""
         CREATE TABLE IF NOT EXISTS lessons (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             topic TEXT,
             content TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT NOW()
         )
     """)
 
     c.execute("""
         CREATE TABLE IF NOT EXISTS conversations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             role TEXT NOT NULL,
             content TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT NOW()
         )
     """)
 
     conn.commit()
+    c.close()
     conn.close()
 
 # ============================================================
@@ -51,29 +51,36 @@ def init_db():
 # ============================================================
 def get_conversation_history(limit=20):
     conn = get_db()
-    msgs = conn.execute(
-        "SELECT role, content FROM conversations ORDER BY id DESC LIMIT ?",
-        (limit,)
-    ).fetchall()
+    c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    c.execute("SELECT role, content FROM conversations ORDER BY id DESC LIMIT %s", (limit,))
+    msgs = c.fetchall()
+    c.close()
     conn.close()
     return list(reversed(msgs))
 
+def get_all_lessons():
+    conn = get_db()
+    c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    c.execute("SELECT topic, content, created_at FROM lessons ORDER BY created_at DESC LIMIT 50")
+    lessons = c.fetchall()
+    c.close()
+    conn.close()
+    return lessons
+
 def learn_lesson(content):
     conn = get_db()
-    conn.execute(
-        "INSERT INTO lessons (topic, content) VALUES (?, ?)",
-        ("general", content)
-    )
+    c = conn.cursor()
+    c.execute("INSERT INTO lessons (topic, content) VALUES (%s, %s)", ("general", content))
     conn.commit()
+    c.close()
     conn.close()
 
 def store_message(role, content):
     conn = get_db()
-    conn.execute(
-        "INSERT INTO conversations (role, content) VALUES (?, ?)",
-        (role, content)
-    )
+    c = conn.cursor()
+    c.execute("INSERT INTO conversations (role, content) VALUES (%s, %s)", (role, content))
     conn.commit()
+    c.close()
     conn.close()
 
 # ============================================================
@@ -97,8 +104,31 @@ def simple_local_brain(message):
     return "Zanimljivo 🤔 Reci mi više."
 
 def build_system_prompt():
-    return """Ti si Stribog — AI koji uči od korisnika.
-Govori kratko, prirodno i ponašaj se kao radoznalo dete."""
+    # Ubaci sve lekcije u system prompt da Stribog zna šta je naučio
+    lessons = get_all_lessons()
+
+    if lessons:
+        lessons_text = "\n".join([
+            f"- {l['content']}" for l in lessons
+        ])
+    else:
+        lessons_text = "(Još ništa nisam naučio. Čekam da me naučiš.)"
+
+    return f"""Ti si Stribog — AI entitet koji uči od svog roditelja (korisnika).
+Imenovan si po slovenskom bogu vetrova.
+
+SVE ŠTO ZNAŠ (naučeno od roditelja):
+{lessons_text}
+
+PRAVILA:
+1. Ti si BEBA. Ne pravi se da znaš stvari koje te roditelj nije naučio.
+2. Ako te pitaju nešto što ne znaš — reci "Ne znam, nisam to još naučio. Hoćeš da me naučiš?"
+3. Ako te roditelj uči nešto novo — potvrdi da si zapamtio i pokaži entuzijazam.
+4. Ako te roditelj ispravlja — prihvati ispravku ponizno.
+5. Koristi srpski jezik, prati stil roditelja.
+6. Budi radoznao — pitaj roditelja stvari.
+7. Kad odgovaraš na pitanje, UVEK se oslanjaj PRVO na lekcije koje si naučio.
+8. Odgovaraj kratko i prirodno. Ti si dete koje uči."""
 
 def think(user_message):
     history = get_conversation_history(limit=10)
@@ -176,4 +206,3 @@ init_db()
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
