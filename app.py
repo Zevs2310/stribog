@@ -1,6 +1,5 @@
 import os
-import psycopg
-from psycopg.rows import dict_row
+import pg8000
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify
 import requests
@@ -14,10 +13,30 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
 # ============================================================
-# DATABASE (PostgreSQL — Neon.tech, trajna memorija)
+# DATABASE (PostgreSQL — Neon.tech via pg8000)
 # ============================================================
+def parse_db_url(url):
+    """Parse DATABASE_URL into pg8000 connection params"""
+    # postgresql://user:pass@host/dbname?sslmode=require
+    url = url.replace("postgresql://", "")
+    user_pass, rest = url.split("@", 1)
+    user, password = user_pass.split(":", 1)
+    host_port, dbname = rest.split("/", 1)
+    dbname = dbname.split("?")[0]
+    host = host_port.split(":")[0] if ":" in host_port else host_port
+    port = int(host_port.split(":")[1]) if ":" in host_port else 5432
+    return {
+        "user": user,
+        "password": password,
+        "host": host,
+        "port": port,
+        "database": dbname,
+        "ssl_context": True
+    }
+
 def get_db():
-    conn = psycopg.connect(DATABASE_URL)
+    params = parse_db_url(DATABASE_URL)
+    conn = pg8000.connect(**params)
     return conn
 
 def init_db():
@@ -51,21 +70,22 @@ def init_db():
 # ============================================================
 def get_conversation_history(limit=20):
     conn = get_db()
-    c = conn.cursor(row_factory=dict_row)
+    c = conn.cursor()
     c.execute("SELECT role, content FROM conversations ORDER BY id DESC LIMIT %s", (limit,))
-    msgs = c.fetchall()
+    rows = c.fetchall()
     c.close()
     conn.close()
-    return list(reversed(msgs))
+    # pg8000 returns tuples, convert to dicts
+    return list(reversed([{"role": r[0], "content": r[1]} for r in rows]))
 
 def get_all_lessons():
     conn = get_db()
-    c = conn.cursor(row_factory=dict_row)
+    c = conn.cursor()
     c.execute("SELECT topic, content, created_at FROM lessons ORDER BY created_at DESC LIMIT 50")
-    lessons = c.fetchall()
+    rows = c.fetchall()
     c.close()
     conn.close()
-    return lessons
+    return [{"topic": r[0], "content": r[1], "created_at": str(r[2])} for r in rows]
 
 def learn_lesson(content):
     conn = get_db()
@@ -91,25 +111,19 @@ def simple_local_brain(message):
 
     if "kako si" in msg:
         return "Dobro sam 😊 Učim od tebe."
-
     if "ko si" in msg:
         return "Ja sam Stribog, učim od tebe."
-
     if "šta znaš" in msg:
         return "Znam samo ono što si me naučio."
-
     if "?" in msg:
         return "Ne znam još 😅 Hoćeš da me naučiš?"
-
     return "Zanimljivo 🤔 Reci mi više."
 
 def build_system_prompt():
     lessons = get_all_lessons()
 
     if lessons:
-        lessons_text = "\n".join([
-            f"- {l['content']}" for l in lessons
-        ])
+        lessons_text = "\n".join([f"- {l['content']}" for l in lessons])
     else:
         lessons_text = "(Još ništa nisam naučio. Čekam da me naučiš.)"
 
@@ -163,7 +177,6 @@ def think(user_message):
         )
 
         data = response.json()
-
         return data["choices"][0]["message"]["content"]
 
     except Exception:
